@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+.venv/
+.idea/
+.ipynb_checkpoints
+data/
+models/
+old/
+vector_store*/
+VECTOR_STORE*/
+*.log
