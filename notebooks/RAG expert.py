@@ -22,6 +22,27 @@ from langchain.vectorstores import Chroma
 import joblib
 import os
 
+# +
+import langchain
+print(langchain.__version__)
+
+import langchain_ollama
+print(langchain_ollama.__version__)
+
+# !pip show chromadb
+
+
+# -
+
+import sys
+print(sys.executable)
+
+
+# !pip list > jupyter_packages.txt
+
+
+# !pip freeze > requirements.txt
+
 from langchain.chat_models import ChatOllama
 llm = ChatOllama(model="llama2")
 # Example usage
@@ -62,14 +83,14 @@ def print_pdf_summary(summary):
 
 # -
 
-pdfReader=PdfReader("data/SteveJobs autobiography book.pdf")
-# steve-jobs-stanford-university-commencement-speech.pdf
+#pdfReader=PdfReader("../data/SteveJobs-autobiography-book.pdf")
+pdfReader=PdfReader("../data/steve-jobs-stanford-university-commencement-speech.pdf")
 summary = get_pdf_summary(pdfReader)
 print_pdf_summary(summary)
 
 # +
-data_directory = "data"
-vector_store_directory = "vector_store"
+data_directory = "../data"
+vector_store_directory = "../vector_store"
 
 from langchain_ollama import OllamaEmbeddings
 
@@ -101,7 +122,7 @@ def load_or_create_chroma(
         if os.path.exists(db_file):
             print(f"Loading existing Chroma vector store from: {vector_store_directory}")
             vector_store = Chroma(persist_directory=vector_store_directory)
-            
+            vector_store._embedding_function = choose_embedding_function()
             '''if (vector_store._embedding_function.__class__ != embedding_function.__class__):
                 print("Embedding function has changed. Recreating vectorstore.")
                 shutil.rmtree(vector_store_directory)
@@ -165,13 +186,14 @@ def display_vector_store_summary(vector_store: Chroma):
             print(f"  Model: {embedding_function.model}")
         # Add other relevant embedding function attributes as needed
 
-        metadata = collection.metadata
-        if metadata:
-            print("Metadata:")
-            for key, value in metadata.items():
-                print(f"  {key}: {value}")
-        else:
-          print("No metadata available")
+        if hasattr(collection, "metadata"):
+            metadata = collection.metadata
+            if metadata:
+                print("Metadata:")
+                for key, value in metadata.items():
+                    print(f"  {key}: {value}")
+            else:
+              print("No metadata available")
 
         if count > 0:
             peek = collection.peek()
@@ -183,7 +205,6 @@ def display_vector_store_summary(vector_store: Chroma):
 
     except Exception as e:
         print(f"Error displaying vector store summary: {e}")
-
 
 
 # Example usage (assuming you have defined choose_embedding_function and textChunks):
@@ -297,7 +318,7 @@ final_answer = final_chain.invoke({"combined_context": combined_context, "questi
 print(final_answer["text"])
 
 # 9. Ask a question
-query = "List names and birthdates of all Steve Jobs's children"
+query = "Who was Steve Jobs?"
 combined_context = get_context(query)
 final_answer = final_chain.invoke({"combined_context": combined_context, "question": query})
 print(final_answer["text"])
