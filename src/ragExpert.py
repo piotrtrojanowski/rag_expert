@@ -1,8 +1,11 @@
 import logging
+import os
 from langchain_core.language_models.base import BaseLanguageModel
 from pdfRetriever import PdfRetriever
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from langchain_community.utilities import GoogleSearchAPIWrapper
+from langchain_community.utilities import SerpAPIWrapper
 
 class RAGExpert:
     def __init__(self, llm: BaseLanguageModel, pdfRetriever: PdfRetriever):
@@ -11,7 +14,14 @@ class RAGExpert:
 
         # Set up logger for this class
         self.logger = logging.getLogger(__name__)
-        self.logger.info("RAG Expert initialized!")
+
+        #Initialize the internet searches - SerpAPI - a tool for internet search (Crucially with the wrapper)
+        self.serpapi_api_key = os.environ.get("SERPAPI_API_KEY") #does not work, so workaround below
+        if self.serpapi_api_key:
+            self.internet_search = SerpAPIWrapper(serpapi_api_key=self.serpapi_api_key)
+        else:
+            print("SERPAPI_API_KEY environment variable not set. Internet searches will be unavailable.")
+            self.internet_search = [] # search is unavailable if no API key
 
         self.final_template = """Use the combined context below from PDFs, an LLM, and the internet to answer the question. 
                             Treat the three contexts as three sources of information. If the information is not present in the context say I don't know.
@@ -24,6 +34,8 @@ class RAGExpert:
 
         self.FINAL_PROMPT = PromptTemplate(template=self.final_template, input_variables=["combined_context", "question"])
         self.final_chain = LLMChain(llm=self.llm, prompt=self.FINAL_PROMPT)
+
+        self.logger.info("RAG Expert initialized!")
 
     def respond(self, query):
         # Replace this with the actual logic for processing queries
@@ -45,7 +57,7 @@ class RAGExpert:
         llm_context = self.llm.invoke(query).content
         self.logger.debug(f"LLM context: {llm_context}")
 
-        internet_context = "Internet context" # TODO internet_search.run(query) if internet_search else "Internet search is unavailable."
+        internet_context = self.internet_search.run(query) if self.internet_search else "Internet search is unavailable."
         self.logger.debug(f"Internet context: {internet_context}")
 
         combined_context = f"PDF Context:\n{pdf_context}\n\nLLM Context:\n{llm_context}\n\nInternet Context:\n{internet_context}"

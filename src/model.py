@@ -11,7 +11,11 @@ class Model:
         self.logger.info("Initializing Model...")
 
         try:
-            self.llm = ChatOllama(model="llama2")
+            #self.llm = ChatOllama(model="llama2")
+            #self.llm = ChatOllama(model="mistral")
+            self.llm = ChatOllama(model="gemma")
+            #self.llm = ChatOllama(model="tinyllama")
+            
             self.logger.debug(f"LLM created: {self.llm.invoke("What is the capital of France?")}")
             self.logger.info("LLM proxy initialized")
 
