@@ -268,8 +268,6 @@ for path in pdf_paths:
 from langchain_community.utilities import GoogleSearchAPIWrapper
 
 serpapi_api_key = os.environ.get("SERPAPI_API_KEY") #does not work, so workaround below
-SERPAPI_API_KEY='49c6ecf880ecddcca49c7795464d7d235a932823cba6f66afe70c01e91383536'
-serpapi_api_key=SERPAPI_API_KEY
 if serpapi_api_key:
     internet_search = SerpAPIWrapper(serpapi_api_key=serpapi_api_key)
 else:
