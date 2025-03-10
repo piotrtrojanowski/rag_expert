@@ -4,6 +4,8 @@ from view import View
 from controller import Controller
 import logging
 
+from config import USE_PDF_SOURCE, USE_LLM_SOURCE, USE_INTERNET_SOURCE, FINAL_TOUCH_WITH_LLM
+
 def setup_logging():
     # Create a formatter
     formatter = logging.Formatter(
@@ -19,8 +21,8 @@ def setup_logging():
     file_handler.setFormatter(formatter)
     
     # Set levels
-    console_handler.setLevel(logging.ERROR)
-    file_handler.setLevel(logging.DEBUG)    # More detailed in file
+    console_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.INFO)    # More detailed in file
     
     # Configure root logger
     root_logger = logging.getLogger()
@@ -31,7 +33,12 @@ def setup_logging():
 def main():
     try:
       event_manager = EventManager()
-      model = Model()
+      model = Model(
+                use_pdf_source=USE_PDF_SOURCE, 
+                use_llm_source=USE_LLM_SOURCE,
+                use_internet_source=USE_INTERNET_SOURCE,
+                final_touch_with_llm=FINAL_TOUCH_WITH_LLM
+)
       view = View()
       controller = Controller(model, view, event_manager)
       view.Display("Welcome to the RAG Expert Project!")

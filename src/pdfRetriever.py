@@ -24,7 +24,7 @@ class PdfRetriever:
                 self.vector_store._embedding_function = self.choose_embedding_function()
                 self.logger.info("Reassigned embedding function after loading the vector store.")
         
-                '''if (vector_store._embedding_function.__class__ != embedding_function.__class__):
+                '''if (self.vector_store._embedding_function.__class__ != embedding_function.__class__):
                     print("Embedding function has changed. Recreating vectorstore.")
                     shutil.rmtree(vector_store_directory)
                     raise FileNotFoundError #to trigger recreation'''
@@ -50,8 +50,8 @@ class PdfRetriever:
 
                 textSplitter = RecursiveCharacterTextSplitter(
                     separators=["\n\n", "\n", " "],
-                    chunk_size=500,
-                    chunk_overlap=20,
+                    chunk_size=2000,
+                    chunk_overlap=400,
                     length_function=len
                 )
                 self.textChunks = textSplitter.split_text(raw_text)
@@ -69,7 +69,9 @@ class PdfRetriever:
             self.retriever = self.vector_store.as_retriever()
             self.log_vector_store_summary()
 
-            self.pdf_qa_template = """Use the following context to answer the question at the end. If you don't know the answer based on the context, just say "I don't know".
+            self.pdf_qa_template = """Here is the Context retrieved from the source document relevant to the question at the end.
+                                      Please summarize the text based strictly on the provided sentences from the document.
+                                      Do not add new information. Refine and format text, and do not infer meaning beyond the provided words.
             Context:
             {context}
 
@@ -80,17 +82,17 @@ class PdfRetriever:
 
             self.pdf_retrieval_qa = RetrievalQA.from_chain_type(
                                             llm=self.llm, 
-                                            chain_type="stuff", 
-                                            retriever=self.retriever, 
-                                            chain_type_kwargs={"prompt": self.QA_PROMPT})
+                                            chain_type="map_reduce", 
+                                            retriever=self.retriever) 
+                                            #chain_type_kwargs={"llm_chain_kwargs": {"prompt": self.QA_PROMPT}})
 
         except Exception as e:
             self.logger.error(f"An error occurred with the Chroma vector store: {e}")
             raise
 
-            
     def invoke(self, query):
         self.logger.debug(f"Processing PDF query: {query}")
+        # use the chain of llm + vector_store for retrieval
         result = self.pdf_retrieval_qa.invoke(query)
         self.logger.debug(f"Retrieved PDF result: {result}")
         return result
@@ -162,5 +164,3 @@ class PdfRetriever:
                     self.logger.info(f"  {key}: {value}")
         else:
             self.logger.info("Could not retrieve PDF summary.")
-
-
