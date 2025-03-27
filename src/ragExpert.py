@@ -92,7 +92,8 @@ class RAGExpert:
         
         # PDF Context: Only if USE_PDF is True
         if self.use_pdf_source:
-            pdf_context = self.pdfRetriever.invoke({"query": query})['result']
+            #pdf_context = self.pdfRetriever.invoke({"query": query})['result']
+            pdf_context = self.pdfRetriever.invoke_no_chains(query)
             if pdf_context.strip():
                 clean_pdf = self.clean_text_formatting(pdf_context)
                 contexts.append(("Context retrieved from the pdf: ", clean_pdf))

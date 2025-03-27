@@ -3,55 +3,75 @@ import logging
 
 from PyPDF2 import PdfReader
 from langchain.vectorstores import Chroma
-from langchain_ollama import OllamaEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
+from langchain.schema import BaseRetriever
 from langchain.prompts import PromptTemplate
 from langchain_core.language_models.base import BaseLanguageModel
+from typing import List, Dict
+from bm25RetrieverWithScores import BM25RetrieverWithScores
+from ollamaEmbeddings import DebuggableOllamaEmbeddings
+from hybridRetriever import HybridRetriever
 
 class PdfRetriever:
     def __init__(self, vector_store_directory: str, pdf_file: str, llm: BaseLanguageModel):
             self.logger = logging.getLogger(self.__class__.__name__)
             self.vector_store_directory = vector_store_directory
             self.llm = llm
+            self.embedding_function=DebuggableOllamaEmbeddings(model="mxbai-embed-large")
+        
             """Loads or creates a Chroma vector store efficiently."""
             db_file = os.path.join(self.vector_store_directory, "chroma.sqlite3")
             try:
                 if os.path.exists(db_file):
-                    self.loadPdfRepresentationFromVectorStore()
+                    self.loadPersistedPdfRepresentation()
                 else:
                     self.logger.info(f"db file does not exist in: {db_file}. Creating new Chroma vector store in: {self.vector_store_directory}")
-                    self.createVectorStoreForPdf(pdf_file)
-
-                self.retriever = self.vector_store.as_retriever()
-                self.log_vector_store_summary()
+                    self.createAndPersistPdfRepresentation(pdf_file)
 
                 self.createRetrievalChain()
 
             except Exception as e:
-                self.logger.error(f"An error occurred with the Chroma vector store: {e}")
+                self.logger.error(f"An error occurred: {e}")
                 raise
-
 
     def invoke(self, query):
         self.logger.debug(f"Processing PDF query: {query}")
-        # use the chain of llm + vector_store for retrieval
+        # use the chain of llm + hybrid retriever for retrieval
         result = self.pdf_retrieval_qa.invoke(query)
+        print (f"PDF Retriever response: ", result)
         self.logger.debug(f"Retrieved PDF result: {result}")
         return result
+    
+    def invoke_no_chains(self, query):
+        self.logger.debug(f"Processing PDF query: {query}")
+        # Retrieve relevant documents using HybridRetriever
+        retrieved_docs = self.hybrid_retriever.invoke(query)
+        # Extract content from retrieved documents
+        retrieved_text = "\n\n".join([doc.page_content for doc in retrieved_docs])
+        if not retrieved_text.strip():
+            self.logger.debug("No relevant documents found.")
+            return "I'm sorry, but I couldn't find any relevant information in the document."
+
+        # Format the retrieved content for the LLM
+        llm_input = self.QA_PROMPT.format(context=retrieved_text, question=query)
+        # Call the LLM to generate an answer strictly based on retrieved content
+        llm_response = self.llm.invoke(llm_input)
+        self.logger.debug(f"Retrieved PDF result: {llm_response.pretty_repr()}")
+        return llm_response.pretty_repr()
 
     # ==== AUXILIARY PRIVATE FUNCTIONS ====
-    # Only necessary before the vector store was created
-    def choose_embedding_function(self):
-        # Initialize the embedding function
-        embeddings = OllamaEmbeddings(model="mxbai-embed-large")
-        return embeddings
-    
     def createRetrievalChain(self):
-        self.pdf_qa_template = """Here is the Context retrieved from the source document relevant to the question at the end.
-                                    Please summarize the text based strictly on the provided sentences from the document.
-                                    Do not add new information. Refine and format text, and do not infer meaning beyond the provided words.
+        self.createHybridRetriever()
+
+        self.pdf_qa_template = """You are a strict assistant who must only use the provided context to answer the question.
+                                    If the context does not contain the answer, respond with "I don't know."
+                                    Here is the Context retrieved from the source pdf document relevant to the question at the end.
+                                    Please summarize the text based strictly on the provided.
+                                    Do not add new information. Do not search the internet. Do not add anything from yourself. 
+                                    Refine and format text. Potentially make it more concise. Do not infer meaning beyond the provided words.
         Context:
+                                    
         {context}
 
         Question: {question}
@@ -61,22 +81,29 @@ class PdfRetriever:
 
         self.pdf_retrieval_qa = RetrievalQA.from_chain_type(
                                         llm=self.llm, 
-                                        chain_type="map_reduce", 
-                                        retriever=self.retriever) 
-                                        #chain_type_kwargs={"llm_chain_kwargs": {"prompt": self.QA_PROMPT}})
-                                        
-    def loadPdfRepresentationFromVectorStore(self):
-        self.vector_store = Chroma(persist_directory=self.vector_store_directory)
-        #re-assign the embedding function manually since it is not loaded from the file (bug I suppose)
-        self.vector_store._embedding_function = self.choose_embedding_function()
-        self.logger.info("Reassigned embedding function after loading the vector store.")
-
-        '''if (self.vector_store._embedding_function.__class__ != embedding_function.__class__):
-            print("Embedding function has changed. Recreating vectorstore.")
-            shutil.rmtree(vector_store_directory)
-                    raise FileNotFoundError #to trigger recreation'''
+                                        chain_type="stuff", #"map_reduce", 
+                                        retriever=self.hybrid_retriever)
+                                                
+    def createHybridRetriever(self):
+        self.chroma_retriever = self.vector_store.as_retriever()
+        # Combine both retrievers into a HybridRetriever
+        self.hybrid_retriever = HybridRetriever(
+            bm25_retriever=self.bm25_retriever, 
+            vector_retriever=self.chroma_retriever,
+            embedding_function=self.embedding_function,
+            bm25_weight=0.5)
     
-    def createVectorStoreForPdf(self, pdf_file):
+    def loadPersistedPdfRepresentation(self):
+        self.vector_store = Chroma(persist_directory=self.vector_store_directory, 
+                                   embedding_function=self.embedding_function)
+        self.logger.info("Reassigned embedding function after loading the vector store.")
+        self.log_vector_store_summary()
+        #load bm25 representation
+        self.bm25_retriever = BM25RetrieverWithScores.load(os.path.join(self.vector_store_directory, "bm25_retriever.pkl"))
+        print("BM25 instance:", self.bm25_retriever)
+    
+
+    def createAndPersistPdfRepresentation(self, pdf_file):
         pdfReader = PdfReader(pdf_file)
         pdf_summary = self.get_pdf_summary(pdfReader)
         self.log_pdf_summary(pdf_summary)
@@ -96,22 +123,25 @@ class PdfRetriever:
             self.logger.info("raw_text is empty. Cannot create a vector store.")
 
         textSplitter = RecursiveCharacterTextSplitter(
-            separators=["\n\n", "\n", " "],
+            separators=["\n\n", ". ", "\n"],
             chunk_size=2000,
             chunk_overlap=400,
-            length_function=len
-        )
+            length_function=len)
         self.textChunks = textSplitter.split_text(raw_text)
         self.logger.info(f"Length of textChunks: {len(self.textChunks)}")
         
         self.vector_store = Chroma.from_texts(
             texts=self.textChunks,
-            embedding=self.choose_embedding_function(),
-            persist_directory=self.vector_store_directory
-        )
-
+            embedding=self.embedding_function,
+            persist_directory=self.vector_store_directory)
+        
+        self.log_vector_store_summary()
         self.logger.info(f"Persisting new Chroma vector store to: {self.vector_store_directory}")
         self.vector_store.persist()
+        
+        # create and save_bm25_retriever        
+        self.bm25_retriever = BM25RetrieverWithScores.from_texts(self.textChunks)
+        self.bm25_retriever.save(os.path.join(self.vector_store_directory, "bm25_retriever.pkl"))
 
     def log_vector_store_summary(self):
         """Displays a summary of the Chroma vector store, including embedding function info."""
@@ -174,5 +204,3 @@ class PdfRetriever:
                     self.logger.info(f"  {key}: {value}")
         else:
             self.logger.info("Could not retrieve PDF summary.")
-
-    

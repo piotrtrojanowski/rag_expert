@@ -11,7 +11,8 @@ class Model:
         self.logger.info("Initializing Model...")
 
         try:
-            self.llm = ChatOllama(model="llama2")
+            self.llm = ChatOllama(model="gemma3")
+            #self.llm = ChatOllama(model="llama2")
             #self.llm = ChatOllama(model="mistral")
             #self.llm = ChatOllama(model="gemma")
             #self.llm = ChatOllama(model="tinyllama")
