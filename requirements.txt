@@ -14,3 +14,5 @@ PyPDF2
 google-search-results
 rank_bm25 
 faiss-cpu
+transformers
+

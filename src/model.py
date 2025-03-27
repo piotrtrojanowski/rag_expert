@@ -5,7 +5,7 @@ from pdfRetriever import PdfRetriever
 from ragExpert import RAGExpert
 
 class Model:
-    def __init__(self, use_pdf_source, use_llm_source, use_internet_source, final_touch_with_llm):
+    def __init__(self, use_pdf_source, use_chain, use_llm_source, use_internet_source, final_touch_with_llm):
         # Set up logger for this class
         self.logger = logging.getLogger(__name__)
         self.logger.info("Initializing Model...")
@@ -29,6 +29,7 @@ class Model:
 
             self.ragExpert = RAGExpert(self.llm, self.pdfRetriever, 
                                        use_pdf_source, 
+                                       use_chain,
                                        use_llm_source, 
                                        use_internet_source, 
                                        final_touch_with_llm)

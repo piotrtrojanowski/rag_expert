@@ -9,13 +9,15 @@ from langchain_community.utilities import SerpAPIWrapper
 
 class RAGExpert:
     def __init__(self, llm: BaseLanguageModel, pdfRetriever: PdfRetriever,
-                 use_pdf_source, use_llm_source, use_internet_source, final_touch_with_llm):
+                 use_pdf_source, use_chain, use_llm_source, use_internet_source, final_touch_with_llm):
         self.llm = llm
         self.pdfRetriever = pdfRetriever
         self.use_pdf_source=use_pdf_source
+        self.use_chain = use_chain
         self.use_llm_source=use_llm_source
         self.use_internet_source=use_internet_source
         self.final_touch_with_llm=final_touch_with_llm
+        self.use_chain=use_chain
         
         # Set up logger for this class
         self.logger = logging.getLogger(__name__)
@@ -92,8 +94,12 @@ class RAGExpert:
         
         # PDF Context: Only if USE_PDF is True
         if self.use_pdf_source:
-            #pdf_context = self.pdfRetriever.invoke({"query": query})['result']
-            pdf_context = self.pdfRetriever.invoke_no_chains(query)
+            pdf_context = []
+            if self.use_chain:
+                pdf_context = self.pdfRetriever.invoke({"query": query})['result']
+            else:
+                pdf_context = self.pdfRetriever.invoke_no_chains(query)
+            
             if pdf_context.strip():
                 clean_pdf = self.clean_text_formatting(pdf_context)
                 contexts.append(("Context retrieved from the pdf: ", clean_pdf))

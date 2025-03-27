@@ -4,7 +4,7 @@ from view import View
 from controller import Controller
 import logging
 
-from config import USE_PDF_SOURCE, USE_LLM_SOURCE, USE_INTERNET_SOURCE, FINAL_TOUCH_WITH_LLM
+from config import USE_PDF_SOURCE, USE_CHAIN, USE_LLM_SOURCE, USE_INTERNET_SOURCE, FINAL_TOUCH_WITH_LLM
 
 def setup_logging():
     # Create a formatter
@@ -35,6 +35,7 @@ def main():
       event_manager = EventManager()
       model = Model(
                 use_pdf_source=USE_PDF_SOURCE, 
+                use_chain = USE_CHAIN,
                 use_llm_source=USE_LLM_SOURCE,
                 use_internet_source=USE_INTERNET_SOURCE,
                 final_touch_with_llm=FINAL_TOUCH_WITH_LLM
